@@ -1,10 +1,22 @@
-# Bloc Sales CRM | Foundation Engineer Edition
+# 🚀 Bloc Sales CRM | Foundation Engineer Submission
 
 A high-performance lead management system designed to handle **10k+ leads/day** with zero race conditions, atomic assignment logic, and secure webhook ingestion.
 
 ---
 
+## � Submission Links
+> [!IMPORTANT]
+> Please update the placeholders below with your actual deployment and media links before submitting.
+
+- **Vercel Deployment**: [https://bloc-sales-crm.vercel.app](https://your-deployment-link.vercel.app)
+- **Google Sheets (Test Leads)**: [📊 View Live Spreadsheet](https://docs.google.com/spreadsheets/d/your-sheet-id)
+- **Video Demo**: [🎬 Watch Application Walkthrough](https://drive.google.com/your-video-link)
+
+---
+
 ## 🏗️ Architecture Overview
+
+The system architecture is designed for **stateless horizontal scaling**, offloading complex concurrency management to the database layer to ensure 100% data integrity.
 
 ```text
        [ Google Sheets ]
@@ -35,63 +47,91 @@ A high-performance lead management system designed to handle **10k+ leads/day** 
 
 ---
 
-## ⚠️ Automation Trigger Note
+## ⚙️ Setup & Installation
 
-The current integration uses **Make.com's free tier**, which enforces a **15-minute polling interval** to watch for new Google Sheet rows. 
+Follow these steps to deploy the CRM environment from scratch.
 
-**In a true production environment (Business Tier):**
-- This would be replaced by an **instant webhook trigger** or direct **WhatsApp API integration**.
-- The backend architecture is already optimized for **sub-second ingestion**; only the external automation trigger is restricted by the free plan's frequency.
+### 1. Database Provisioning (Supabase)
+1. Initialize a new project at [supabase.com](https://supabase.com).
+2. Execute the primary schema: Run the contents of [supabase_schema.sql](file:///e:/projects/Assignment_grok/supabase_schema.sql).
+3. Enable the Assignment Engine: Run the contents of [20260227_atomic_assignment.sql](file:///e:/projects/Assignment_grok/migrations/20260227_atomic_assignment.sql).
 
----
+### 2. Application Deployment
+1. Clone the repository and install dependencies: `npm install`.
+2. Configure Environment Variables in `.env.local`:
+   ```env
+   NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+   SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+   WEBHOOK_SECRET=your-secure-webhook-secret
+   ```
+3. Boot the development server: `npm run dev`.
 
-## 🔐 Concurrency & Atomicity Strategy
-
-To ensure data integrity under heavy load, the assignment engine was moved entirely to a **Postgres RPC (Remote Procedure Call)**.
-
-- **Why RPC?**: handling complex logic in Node.js (Fetch -> Calculate -> Update) creates "Check-then-Act" race conditions. Moving it to the DB ensures the entire operation is a single atomic unit.
-- **FOR UPDATE Locking**: We select candidates using `FOR UPDATE`. This locks the specific caller rows until the transaction commits, preventing multiple leads from being assigned to the same caller simultaneously.
-- **Stateless Scaling**: Because the locking happens at the database level, this system can scale horizontally across multiple stateless API instances without needing a central lock manager (like Redis).
-
----
-
-## 📈 Scaling to 10k+ Leads/Day
-
-This CRM is architected for significant growth:
-- **Stateless Next.js API**: The `/api/ingest` endpoint can be deployed as serverless functions, scaling instantly with incoming traffic.
-- **Database Consistency**: Row-level locking ensures that even with massive parallelism, lead distribution remains fair and accurate.
-- **Realtime Scalability**: Supabase Realtime handles message broadcasting independently of the main database load.
-- **Future-Proofing**: The logic can be easily moved to **Supabase Edge Functions** for global, low-latency execution nearer to the lead source.
+### 3. Automation Configuration (Make.com)
+1. **Module 1**: Google Sheets -> "Watch New Rows".
+2. **Module 2**: HTTP -> "Make a Request" (Method: `POST`).
+3. **URL**: `https://your-domain.com/api/ingest`.
+4. **Header**: `X-Webhook-Secret` matching your `.env` value.
 
 ---
 
-## 🔒 Security Considerations
+## 🧠 Smart Assignment Logic (Development Rationale)
 
-- **X-Webhook-Secret**: The ingestion endpoint is protected by a shared secret. Any request without the correct `X-Webhook-Secret` header is rejected with a `401 Unauthorized`.
-- **Database RLS**: Row Level Security is enabled on all tables. Public access is strictly read-only for the real-time feed, while modifications require the service role or authenticated admin sessions.
-- **Duplicate Protection**: An idempotency check prevents phone numbers from being re-ingested within 24 hours, mitigating accidental automation loops or spam.
+The core challenge of this project was ensuring **fairness** and **consistency** in a high-concurrency environment.
 
----
+### 4-Tier Routing Strategy:
+1.  **State Priority**: Leads are first routed to callers assigned to that specific geography.
+2.  **Global Balancing**: If no state-match is found, the system pulls from the global caller pool.
+3.  **Daily Cap Enforcement**: Callers who have reached their `daily_lead_limit` are automatically excluded from the round-robin.
+4.  **Overflow Fallback**: To prevent lead loss, if *all* eligible callers are at capacity, the system assigns the lead to the caller with the absolute fewest leads assigned today.
 
-## 🧪 Manual Verification Checklist
-
-- [ ] **Auth Check**: Access `/api/ingest` without `X-Webhook-Secret` → Result: `401 Unauthorized`.
-- [ ] **Spam Check**: Submit lead with same phone twice (within 24h) → Result: `duplicate: true` (no new assignment).
-- [ ] **Fairness Check**: Verify `assignment_logs` table after multiple leads → Confirm variety of assignment reasons (e.g., `state_match_round_robin`).
-- [ ] **Capacity Check**: Set a caller's `daily_limit` to 1, assign a lead → Confirm subsequent leads trigger `cap_overflow_fallback`.
-- [ ] **Real-time Check**: Open `/dashboard` and submit a lead via CURL → Confirm the row "flashes" instantly without refresh.
+### 🔐 Concurrency Defense:
+We moved the assignment logic from Node.js to a **Postgres RPC** because application-level "fetch-then-update" flows are vulnerable to race conditions. By using **Row-Level Locking (`FOR UPDATE`)**, we ensure that even if 100 leads arrive at the same millisecond, they are queued and assigned sequentially without double-counting or skipping callers.
 
 ---
 
-## 🧪 Interview Quick-Start
-To defend this architecture in an interview, point to:
-- **[assign_lead_atomic.sql](file:///e:/projects/Assignment_grok/migrations/20260227_atomic_assignment.sql)**: The transaction boundary.
-- **[route.ts](file:///e:/projects/Assignment_grok/src/app/api/ingest/route.ts)**: The security & idempotency layer.
-- **[LeadsTable.tsx](file:///e:/projects/Assignment_grok/src/components/LeadsTable.tsx)**: The reactive real-time UI.
+## 🗄️ Database Structure
+
+### 1. `callers` Table
+- **Purpose**: Manages agent capacity and routing preferences.
+- **Key Fields**: `assigned_states` (Array with GIN index for search performance), `leads_assigned_today` (Atomic counter), `last_assigned_at` (Drives round-robin).
+
+### 2. `leads` Table
+- **Purpose**: Centralized lead repository with deduplication logic.
+- **Key Fields**: `phone` (Indexed for 24h duplicate checks), `metadata` (JSONB for flexible ingestion).
+
+### 3. `assignment_logs` Table
+- **Purpose**: Audit trail for debugging routing decisions.
+- **Key Fields**: `assignment_reason` (Records why a specific caller was chosen).
 
 ---
 
-## 🖼️ Preview
-- **Vercel Deployment**: [https://bloc-sales-crm.vercel.app](https://bloc-sales-crm.vercel.app)
-- **Dashboard**: ![Dashboard](./docs/screenshot_dashboard.png)
-- **Callers**: ![Callers](./docs/screenshot_callers.png)
+## ⚠️ Automation Trigger & Scaling Note
+
+> [!NOTE]
+> The current setup uses **Make.com's Free Tier**, which polls Every **15 minutes**. 
+> This is a platform limitation, not a system limitation. The backend is architected for **sub-second ingestion**. On a paid tier or direct WhatsApp API integration, leads appear on the dashboard instantly after submission.
+
+---
+
+## 🛤️ Future Improvements (With More Time)
+1. **Webhook Security**: Implement HMAC-SHA256 signatures for authenticating requests from Make.com.
+2. **Dynamic Routing**: Add language-based matching (already planned in the schema).
+3. **Real-time Performance Metrics**: Visualize caller conversion rates directly on the dashboard.
+4. **Automated Re-assignment**: Automatically move leads if a caller hasn't updated the status within 2 hours.
+
+---
+
+## 🖼️ Visual Preview
+
+### Automation Workflow
+![Make.com Workflow](./docs/make_workflow.png)
+*Visualizing the ingestion pipeline from Google Sheets to Next.js.*
+
+### Real-Time Dashboard
+![Dashboard](./docs/screenshot_dashboard.png)
+*The reactive dashboard showing leads as they are assigned in real-time.*
+
+### Caller Management
+![Callers](./docs/screenshot_callers.png)
+*Interface for adjusting capacities and state routing preferences.*
