@@ -5,11 +5,9 @@ A high-performance lead management system designed to handle **10k+ leads/day** 
 ---
 
 ## � Submission Links
-> [!IMPORTANT]
-> Please update the placeholders below with your actual deployment and media links before submitting.
 
-- **Vercel Deployment**: [https://bloc-sales-crm.vercel.app](https://your-deployment-link.vercel.app)
-- **Google Sheets (Test Leads)**: [📊 View Live Spreadsheet](https://docs.google.com/spreadsheets/d/your-sheet-id)
+- **Vercel Deployment**: [https://bloc-sales-crm.vercel.app](https://bloc-sales-crm.vercel.app/)
+- **Google Sheets (Test Leads)**: [📊 View Live Spreadsheet](https://docs.google.com/spreadsheets/d/1zo0N2n4ihAvU2mzJRl3WPvBcl1KmHhCPHTphppNiUi8/edit?usp=sharing)
 - **Video Demo**: [🎬 Watch Application Walkthrough](https://drive.google.com/your-video-link)
 
 ---
@@ -53,8 +51,8 @@ Follow these steps to deploy the CRM environment from scratch.
 
 ### 1. Database Provisioning (Supabase)
 1. Initialize a new project at [supabase.com](https://supabase.com).
-2. Execute the primary schema: Run the contents of [supabase_schema.sql](file:///e:/projects/Assignment_grok/supabase_schema.sql).
-3. Enable the Assignment Engine: Run the contents of [20260227_atomic_assignment.sql](file:///e:/projects/Assignment_grok/migrations/20260227_atomic_assignment.sql).
+2. Execute the primary schema: Run the contents of [supabase_schema.sql](../supabase_schema.sql).
+3. Enable the Assignment Engine: Run the contents of [20260227_atomic_assignment.sql](../migrations/20260227_atomic_assignment.sql).
 
 ### 2. Application Deployment
 1. Clone the repository and install dependencies: `npm install`.
@@ -125,13 +123,16 @@ We moved the assignment logic from Node.js to a **Postgres RPC** because applica
 ## 🖼️ Visual Preview
 
 ### Automation Workflow
-![Make.com Workflow](./docs/make_workflow.png)
+![Make.com Workflow](<img width="1919" height="916" alt="Screenshot 2026-02-27 194350" src="https://github.com/user-attachments/assets/033d6442-5a9b-443e-9f04-a1adf8f326ff" />,<img width="1919" height="922" alt="Screenshot 2026-02-27 194411" src="https://github.com/user-attachments/assets/59f106ba-2265-4058-be44-5baf4ed4bf63" />
+)
 *Visualizing the ingestion pipeline from Google Sheets to Next.js.*
 
 ### Real-Time Dashboard
-![Dashboard](./docs/screenshot_dashboard.png)
+![Dashboard](<img width="1919" height="967" alt="Screenshot 2026-02-27 194232" src="https://github.com/user-attachments/assets/adeb57b8-04c2-4d2f-bddf-9242ac1af258" />
+)
 *The reactive dashboard showing leads as they are assigned in real-time.*
 
 ### Caller Management
-![Callers](./docs/screenshot_callers.png)
+![Callers](<img width="1919" height="963" alt="Screenshot 2026-02-27 194242" src="https://github.com/user-attachments/assets/e8e60012-09e9-4703-bdb7-35b8bb48cfdf" />
+)
 *Interface for adjusting capacities and state routing preferences.*
