@@ -128,9 +128,9 @@ We moved the assignment logic from Node.js to a **Postgres RPC** because applica
 *Visualizing the ingestion pipeline from Google Sheets to Next.js.*
 
 ### Real-Time Dashboard
-![Dashboard](<img width="1919" height="967" alt="Screenshot 2026-02-27 194232" src="https://github.com/user-attachments/assets/6c0b4f97-12ca-49f7-9b12-b6068427738f" />)
+![Dashboard]()
 *The reactive dashboard showing leads as they are assigned in real-time.*
 
 ### Caller Management
-![Callers](<img width="1919" height="963" alt="Screenshot 2026-02-27 194242" src="https://github.com/user-attachments/assets/9dee430c-c388-4dc5-a28b-12e5d59d4a5f" />)
+![Callers]()
 *Interface for adjusting capacities and state routing preferences.*
