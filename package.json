@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test": "npx tsx src/lib/test-assignment-logic.ts"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.0.5",

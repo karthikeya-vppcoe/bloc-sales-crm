@@ -33,8 +33,29 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 import { smartAssignLead } from '@/lib/assign-lead'
 import type { IngestPayload } from '@/types'
 
+// ── Generic CORS Headers Helper ──────────────────────────────────────────────
+function corsHeaders() {
+    return {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    }
+}
+
 export async function POST(req: NextRequest) {
-    // ── Parse and validate request body ──────────────────────────────────────
+    // ── 1. Secure Ingest Validation ──────────────────────────────────────────
+    const authHeader = req.headers.get('X-Webhook-Secret')
+    const webhookSecret = process.env.WEBHOOK_SECRET
+
+    // Only enforce if secret is configured (standard production practice)
+    if (webhookSecret && authHeader !== webhookSecret) {
+        return NextResponse.json(
+            { success: false, error: 'Unauthorized: Invalid Webhook Secret' },
+            { status: 401, headers: corsHeaders() }
+        )
+    }
+
+    // ── 2. Parse and validate request body ────────────────────────────────────
     let body: IngestPayload
 
     try {
@@ -42,68 +63,93 @@ export async function POST(req: NextRequest) {
     } catch {
         return NextResponse.json(
             { success: false, error: 'Invalid JSON body.' },
-            { status: 400 }
+            { status: 400, headers: corsHeaders() }
         )
     }
 
-    // `phone` is the only required field — it uniquely identifies a WhatsApp lead
     if (!body.phone || body.phone.trim() === '') {
         return NextResponse.json(
             { success: false, error: 'Missing required field: phone' },
-            { status: 400 }
+            { status: 400, headers: corsHeaders() }
         )
     }
 
-    // ── Insert lead into the database ─────────────────────────────────────────
-    // We use supabaseAdmin (service_role) so this bypasses RLS.
-    // The lead starts unassigned — smartAssignLead() fills in assigned_caller_id.
+    const cleanPhone = body.phone.trim()
+
+    // ── 3. Duplicate Lead Protection (24h window) ─────────────────────────────
+    // Check if this phone number was already ingested in the last 24 hours.
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+
+    const { data: existingLead } = await supabaseAdmin
+        .from('leads')
+        .select('*')
+        .eq('phone', cleanPhone)
+        .gt('created_at', twentyFourHoursAgo)
+        .limit(1)
+        .maybeSingle()
+
+    if (existingLead) {
+        return NextResponse.json(
+            {
+                success: true,
+                duplicate: true,
+                message: 'Duplicate lead detected (24h protection)',
+                lead: existingLead
+            },
+            { status: 200, headers: corsHeaders() }
+        )
+    }
+
+    // ── 4. Insert lead into the database ──────────────────────────────────────
     const { data: lead, error: insertError } = await supabaseAdmin
         .from('leads')
         .insert({
             name: body.name ?? null,
-            phone: body.phone.trim(),
+            phone: cleanPhone,
             timestamp: body.timestamp ?? new Date().toISOString(),
             lead_source: body.lead_source ?? null,
             city: body.city ?? null,
             state: body.state ?? null,
             metadata: body.metadata ?? {},
         })
-        .select()   // return the inserted row (including its generated uuid)
+        .select()
         .single()
 
     if (insertError || !lead) {
         console.error('[/api/ingest] Insert error:', insertError)
         return NextResponse.json(
             { success: false, error: `Failed to insert lead: ${insertError?.message}` },
-            { status: 500 }
+            { status: 500, headers: corsHeaders() }
         )
     }
 
-    // ── Smart assignment ────────────────────────────────────────────────────
-    // Pass the lead's id and state into the assignment engine.
-    // This function handles all round-robin, cap, and fallback logic internally.
-    const { caller: assignedCaller, error: assignError } = await smartAssignLead(lead)
+    // ── 5. Smart Atomic Assignment ───────────────────────────────────────────
+    // We now delegate the entire assignment logic to a Postgres RPC function
+    // to ensure atomicity, fairness, and race-condition prevention.
+    const assignmentResult = await smartAssignLead(lead)
 
-    if (assignError) {
-        // Non-fatal: lead is already persisted, just not assigned yet.
-        // Log it but return success so Make.com doesn't retry the webhook.
-        console.warn('[/api/ingest] Assignment warning:', assignError)
+    if (assignmentResult.error) {
+        console.warn('[/api/ingest] Assignment warning:', assignmentResult.error)
     }
 
-    // ── Return full response ──────────────────────────────────────────────────
+    // ── 6. Return full response ───────────────────────────────────────────────
     return NextResponse.json(
         {
             success: true,
             lead: {
                 ...lead,
-                assigned_caller_id: assignedCaller?.id ?? null,
-                assigned_at: assignedCaller ? new Date().toISOString() : null,
+                assigned_caller_id: assignmentResult.caller_id,
+                assigned_at: assignmentResult.success ? new Date().toISOString() : null,
             },
-            assignedCaller: assignedCaller ?? null,
-            assignmentWarning: assignError ?? undefined,
+            assignmentResult,
         },
-        { status: 200 }
+        { status: 200, headers: corsHeaders() }
     )
+}
+
+// ── OPTIONS Handler for CORS Preflight ───────────────────────────────────────
+export async function OPTIONS() {
+    return NextResponse.json({}, { headers: corsHeaders() })
 }
 
 // ── Method guard ─────────────────────────────────────────────────────────────
@@ -111,6 +157,6 @@ export async function POST(req: NextRequest) {
 export async function GET() {
     return NextResponse.json(
         { error: 'Method not allowed. Use POST.' },
-        { status: 405 }
+        { status: 405, headers: corsHeaders() }
     )
 }
