@@ -8,7 +8,7 @@ A high-performance lead management system designed to handle **10k+ leads/day** 
 
 - **Vercel Deployment**: [https://bloc-sales-crm.vercel.app](https://bloc-sales-crm.vercel.app/)
 - **Google Sheets (Test Leads)**: [📊 View Live Spreadsheet](https://docs.google.com/spreadsheets/d/1zo0N2n4ihAvU2mzJRl3WPvBcl1KmHhCPHTphppNiUi8/edit?usp=sharing)
-- **Video Demo**: [🎬 Watch Application Walkthrough](https://drive.google.com/your-video-link)
+- **Video Demo**: [🎬 Watch Application Walkthrough](https://drive.google.com/file/d/1rvZIcbXuzgtSvHEWzFt77VCaTUcjwSPs/view?usp=drive_link)
 
 ---
 
